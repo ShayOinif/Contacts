@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Contacts</string>
+    <string name="phones">Phones:</string>
+    <string name="emails">Emails:</string>
+    <string name="number">Number</string>
+    <string name="address">Address</string>
+    <string name="contact_na">The contact is no longer available</string>
+    <string name="navigate_back">Navigate Back</string>
+    <string name="error">Unexpected error has occurred</string>
+    <string name="approve">Approve</string>
+    <string name="decline">Decline</string>
+    <string name="permission_rationale">We need your permission to access contacts in order for the app to work.</string>
+    <string name="no_permissions">You have no permissions</string>
+    <string name="search">Search contacts</string>
+    <string name="empty">Contacts list is empty</string>
+</resources>
