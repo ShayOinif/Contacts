@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -40,40 +41,62 @@ fun HomeScreen(
         android.Manifest.permission.READ_CONTACTS
     )
 
-    if (contactsPermissionState.status.isGranted) {
+    var declined by rememberSaveable {
+        mutableStateOf(false)
+    }
 
-        val listState = rememberLazyListState()
+    when {
+        contactsPermissionState.status.isGranted -> {
 
-        val state by homeViewModel.stateFlow.collectAsStateWithLifecycle()
+            val listState = rememberLazyListState()
 
-        HomeScreen(
-            state = state,
-            listState = listState,
-            onNewQuery = homeViewModel::onInput,
-            onContactClick = onContactClick,
-            modifier = modifier
-        )
-    } else if (contactsPermissionState.status.shouldShowRationale) {
-        AlertDialog(
-            onDismissRequest = {},
-            confirmButton = {
-                Text(
-                    text = stringResource(id = R.string.approve),
-                    modifier = Modifier.clickable { contactsPermissionState.launchPermissionRequest() }
-                )
-            },
-            dismissButton = {
-                Text(text = stringResource(id = R.string.decline))
-            },
-            text = {
-                Text(text = stringResource(id = R.string.permission_rationale))
+            val state by homeViewModel.stateFlow.collectAsStateWithLifecycle()
+
+            HomeScreen(
+                state = state,
+                listState = listState,
+                onNewQuery = homeViewModel::onInput,
+                onContactClick = onContactClick,
+                modifier = modifier
+            )
+        }
+        declined -> {
+            CenterAlignedBox(
+                modifier = modifier,
+            ) {
+                Text(text = stringResource(id = R.string.no_permissions))
             }
-        )
-    } else {
-        CenterAlignedBox(
-            modifier = modifier,
-        ) {
-            Text(text = stringResource(id = R.string.no_permissions))
+        }
+        contactsPermissionState.status.shouldShowRationale -> {
+            AlertDialog(
+                onDismissRequest = { declined = true },
+                confirmButton = {
+                    Text(
+                        text = stringResource(id = R.string.approve),
+                        modifier = Modifier.clickable { contactsPermissionState.launchPermissionRequest() }
+                    )
+                },
+                dismissButton = {
+                    Text(
+                        text = stringResource(id = R.string.decline),
+                        modifier = Modifier.clickable { declined = true }
+                    )
+                },
+                text = {
+                    Text(text = stringResource(id = R.string.permission_rationale))
+                }
+            )
+        }
+        else -> {
+            LaunchedEffect(key1 = true) {
+                contactsPermissionState.launchPermissionRequest()
+            }
+
+            CenterAlignedBox(
+                modifier = modifier,
+            ) {
+                Text(text = stringResource(id = R.string.no_permissions))
+            }
         }
     }
 }
