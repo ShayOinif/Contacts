@@ -1,13 +1,11 @@
 package com.shayo.contacts.ui.home
 
-import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shayo.contacts.data.ContactsRepository
 import com.shayo.contacts.data.model.Contact
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -15,6 +13,7 @@ import javax.inject.Inject
 
 private const val TYPE_DEBOUNCE = 300L
 private const val CONFIGURATION_CHANGE_TIMEOUT = 1_500L
+private const val QUERY_KEY = "query"
 
 /**
  * Here I used a hilt injected view model cause it's a bit easier to inject additional
@@ -23,12 +22,10 @@ private const val CONFIGURATION_CHANGE_TIMEOUT = 1_500L
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
-    @ApplicationContext context: Context,
-    ) : ViewModel() {
+    contactsRepository: ContactsRepository,
+) : ViewModel() {
 
-    private val contactsRepository = ContactsRepository(context)
-
-    private val query =  savedStateHandle.getStateFlow("query", "")
+    private val query =  savedStateHandle.getStateFlow(key = QUERY_KEY, initialValue = "")
 
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     private val contactsFlow = query
@@ -56,7 +53,7 @@ class HomeViewModel @Inject constructor(
     )
 
     fun onInput(newQuery: String) {
-        savedStateHandle["query"] = newQuery
+        savedStateHandle[QUERY_KEY] = newQuery
     }
 }
 

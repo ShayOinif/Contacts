@@ -1,25 +1,23 @@
 package com.shayo.contacts.ui.detail
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import com.shayo.contacts.ContactsApp
 import com.shayo.contacts.data.ContactsRepository
 import com.shayo.contacts.data.model.DetailedContact
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import javax.inject.Inject
 
-class ContactDetailViewModel(
-    contactId: String?,
-    contactsRepository: ContactsRepository,
-    ) : ViewModel() {
+@HiltViewModel
+class ContactDetailViewModel @Inject constructor(
+    private val contactsRepository: ContactsRepository,
+) : ViewModel() {
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val detailedContactFlow = contactsRepository.getContact(contactId)
+    fun getDetailedContactFlow(contactId: String?) = contactsRepository.getContact(contactId)
         .mapLatest { result ->
             result.fold(
                 onSuccess = { detailedContact ->
@@ -41,17 +39,17 @@ class ContactDetailViewModel(
             initialValue = ContactDetailUiState.Loading
         )
 
+    /* After the switch to hilt I don't need the factory in order to get a singleton repository
+     * which the application holds.
     companion object {
-
-        fun getFactory(contactId: String?) = viewModelFactory {
+        val Factory = viewModelFactory {
             initializer {
                 ContactDetailViewModel(
-                    contactId =  contactId,
                     contactsRepository= (get(ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY) as ContactsApp).contactsRepo,
                 )
             }
         }
-    }
+    }*/
 }
 
 sealed interface ContactDetailUiState {

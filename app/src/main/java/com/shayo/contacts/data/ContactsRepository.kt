@@ -4,21 +4,27 @@ import android.content.Context
 import android.database.ContentObserver
 import android.database.Cursor
 import android.provider.ContactsContract
-import android.util.Log
 import androidx.core.database.getStringOrNull
 import com.shayo.contacts.data.model.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
+import javax.inject.Inject
+import javax.inject.Singleton
 
 private const val CONNECTION_TIMEOUT = 1_500L
 
 private enum class DetailType { PHONE, EMAIL }
 
-class ContactsRepository(private val context: Context) {
+@Singleton
+class ContactsRepository @Inject constructor(
+    @ApplicationContext
+    private val context: Context,
+) {
 
     private val coroutineScope = CoroutineScope(context = SupervisorJob())
 
@@ -134,9 +140,6 @@ private fun Context.queryAllContacts(): Result<List<Contact>> {
             val displayNameIndex = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
             val thumbnailUri =
                 cursor.getColumnIndex(ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)
-
-            Log.d("SHay", "$lookupKeyIndex $displayNameIndex $thumbnailUri")
-
 
             if (lookupKeyIndex == ILLEGAL_INDEX || displayNameIndex == ILLEGAL_INDEX || thumbnailUri == ILLEGAL_INDEX)
                 Result.failure(Exception(COLUMN_ERROR))

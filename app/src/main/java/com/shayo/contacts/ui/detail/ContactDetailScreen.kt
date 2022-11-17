@@ -12,9 +12,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.ExperimentalLifecycleComposeApi
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shayo.contacts.R
 import com.shayo.contacts.ui.common.CenterAlignedBox
 import com.shayo.contacts.ui.common.ContactInfo
@@ -26,11 +26,13 @@ import com.shayo.contacts.ui.common.LoadingBox
 fun ContactDetailScreen(
     contactId: String?,
     modifier: Modifier = Modifier,
-    detailViewModel: ContactDetailViewModel = viewModel(
+    detailViewModel: ContactDetailViewModel = hiltViewModel(),
+    /* The old way to get the view model with the factory
+    = viewModel(
         factory = ContactDetailViewModel.getFactory(contactId = contactId)
-    ),
+    ),*/
 ) {
-    val state by detailViewModel.detailedContactFlow.collectAsStateWithLifecycle()
+    val state by detailViewModel.getDetailedContactFlow(contactId).collectAsStateWithLifecycle()
 
     when (state) {
         is ContactDetailUiState.Success -> {
