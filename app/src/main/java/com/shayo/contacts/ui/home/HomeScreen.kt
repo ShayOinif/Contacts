@@ -17,9 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.ExperimentalLifecycleComposeApi
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -34,7 +34,7 @@ import com.shayo.contacts.ui.common.ErrorBox
 fun HomeScreen(
     onContactClick: (contactId: String) -> Unit,
     modifier: Modifier = Modifier,
-    homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
+    homeViewModel: HomeViewModel = hiltViewModel(),
 ) {
 
     val contactsPermissionState = rememberPermissionState(

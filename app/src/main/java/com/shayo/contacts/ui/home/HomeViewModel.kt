@@ -1,32 +1,43 @@
 package com.shayo.contacts.ui.home
 
+import android.content.Context
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
-import com.shayo.contacts.ContactsApp
 import com.shayo.contacts.data.ContactsRepository
 import com.shayo.contacts.data.model.Contact
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
+import javax.inject.Inject
 
 private const val TYPE_DEBOUNCE = 300L
 private const val CONFIGURATION_CHANGE_TIMEOUT = 1_500L
 
-class HomeViewModel(private val contactsRepository: ContactsRepository) : ViewModel() {
+/**
+ * Here I used a hilt injected view model cause it's a bit easier to inject additional
+ * dependencies alongside the saved state handle.
+ */
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
+    @ApplicationContext context: Context,
+    ) : ViewModel() {
 
-    private val queryFlow = MutableStateFlow("")
+    private val contactsRepository = ContactsRepository(context)
+
+    private val query =  savedStateHandle.getStateFlow("query", "")
 
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-    private val contactsFlow = queryFlow
+    private val contactsFlow = query
         .debounce(timeoutMillis = TYPE_DEBOUNCE)
         .flatMapLatest { newQuery ->
             contactsRepository.queryContacts(newQuery)
         }
 
-    val stateFlow = combine(queryFlow, contactsFlow) { newQuery, contactsResult ->
+    val stateFlow = combine(query, contactsFlow) { newQuery, contactsResult ->
         contactsResult.fold(
             onSuccess = { contactsList ->
                 HomeScreenUiState.Success(
@@ -45,15 +56,7 @@ class HomeViewModel(private val contactsRepository: ContactsRepository) : ViewMo
     )
 
     fun onInput(newQuery: String) {
-        queryFlow.value = newQuery
-    }
-
-    companion object {
-        val Factory = viewModelFactory {
-            initializer {
-                HomeViewModel((get(APPLICATION_KEY) as ContactsApp).contactsRepo)
-            }
-        }
+        savedStateHandle["query"] = newQuery
     }
 }
 

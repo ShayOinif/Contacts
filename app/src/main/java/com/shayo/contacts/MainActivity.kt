@@ -13,7 +13,9 @@ import androidx.navigation.compose.rememberNavController
 import com.shayo.contacts.ui.navigation.HomeGraphRoutePattern
 import com.shayo.contacts.ui.navigation.homeGraph
 import com.shayo.contacts.ui.theme.ContactsTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
