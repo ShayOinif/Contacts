@@ -1,9 +1,11 @@
 package com.shayo.contacts.data
 
+import android.content.ContentValues
 import android.content.Context
 import android.database.ContentObserver
 import android.database.Cursor
 import android.provider.ContactsContract
+import android.util.Log
 import androidx.core.database.getStringOrNull
 import com.shayo.contacts.data.model.*
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -53,12 +55,12 @@ class ContactsRepository @Inject constructor(
     )
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun queryContacts(query: String) =
+    fun queryContacts(query: String?) =
         contactsFlow.mapLatest { result ->
             result.map { contactList ->
                 contactList.filter { contact ->
                     contact.displayName.contains(
-                        other = query,
+                        other = query ?: "",
                         ignoreCase = true,
                     )
                 }
@@ -66,14 +68,18 @@ class ContactsRepository @Inject constructor(
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getContact(contactId: String?) =
+    fun getContact(lookupKey: String?) =
         contactsFlow.mapLatest { result ->
             result.fold(
                 onSuccess = { contactsList ->
+                    // TODO: Maybe keep a map on available contacts avoid long find..
                     contactsList.find { contact ->
-                        contact.id == contactId
+                        lookupKey?.split(".")?.all { partialKey ->
+                            contact.lookupKey.contains(partialKey)
+                        } == true
                     }?.let { contact ->
-                        val selectionArgs = arrayOf(contactId)
+
+                        val selectionArgs = arrayOf<String?>("${contact.id}")
 
                         val phonesResult = context.getDetails(
                             projection = PHONE_PROJECTION,
@@ -115,6 +121,34 @@ class ContactsRepository @Inject constructor(
                 }
             )
         }
+
+
+    // TODO: Move to Work Manager, and incorporate is dirty mechanism in order to save only changes
+    suspend fun updateContact(detailedContact: DetailedContact) {
+        detailedContact.emails.forEach {
+            updateDetail(it.id, it.value)
+        }
+
+        detailedContact.phones.forEach {
+            updateDetail(it.id, it.value)
+        }
+    }
+
+    private suspend fun updateDetail(
+        detailId: Long,
+        newValue: String,
+    ) {
+        val values = ContentValues().apply {
+            put(ContactsContract.Data.DATA1, newValue)
+        }
+
+        context.contentResolver.update(
+            ContactsContract.Data.CONTENT_URI,
+            values,
+            "${ContactsContract.Data._ID} = ?",
+            arrayOf("$detailId")
+        )
+    }
 }
 
 private const val ILLEGAL_INDEX = -1
@@ -126,6 +160,7 @@ private fun Context.queryAllContacts(): Result<List<Contact>> {
     var cursor: Cursor? = null
 
     return try {
+
         val contacts = mutableListOf<Contact>()
 
         cursor = contentResolver.query(
@@ -136,21 +171,23 @@ private fun Context.queryAllContacts(): Result<List<Contact>> {
         )
 
         cursor?.let {
+            val idIndex = cursor.getColumnIndex(ContactsContract.Contacts._ID)
             val lookupKeyIndex = cursor.getColumnIndex(ContactsContract.Contacts.LOOKUP_KEY)
             val displayNameIndex = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
             val thumbnailUri =
                 cursor.getColumnIndex(ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)
 
-            if (lookupKeyIndex == ILLEGAL_INDEX || displayNameIndex == ILLEGAL_INDEX || thumbnailUri == ILLEGAL_INDEX)
+            if (lookupKeyIndex == ILLEGAL_INDEX || displayNameIndex == ILLEGAL_INDEX || thumbnailUri == ILLEGAL_INDEX || idIndex == ILLEGAL_INDEX)
                 Result.failure(Exception(COLUMN_ERROR))
             else {
                 while (cursor.moveToNext()) {
                     contacts.add(
                         with(cursor) {
                             Contact(
-                                id = getString(lookupKeyIndex),
+                                id = getLong(idIndex),
                                 displayName = getString(displayNameIndex),
                                 photoUri = getStringOrNull(thumbnailUri),
+                                lookupKey = getString(lookupKeyIndex)
                             )
                         }
                     )
@@ -162,6 +199,7 @@ private fun Context.queryAllContacts(): Result<List<Contact>> {
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
+        Log.d("Shay", e.message!!)
         Result.failure(e)
     } finally {
         cursor?.close()
@@ -189,15 +227,18 @@ private fun Context.getDetails(
         )
 
         cursor?.let {
-            val valueIndex = cursor.getColumnIndex(projection[0])
-            val typeIndex = cursor.getColumnIndex(projection[1])
+            val idIndex = cursor.getColumnIndex(projection[0])
+            val valueIndex = cursor.getColumnIndex(projection[1])
+            val typeIndex = cursor.getColumnIndex(projection[2])
 
             if (valueIndex == ILLEGAL_INDEX || typeIndex == ILLEGAL_INDEX)
                 Result.failure<List<ContactDetail>>(Exception(COLUMN_ERROR))
             else {
                 while (cursor.moveToNext()) {
+
                     details.add(
                         ContactDetail(
+                            id = cursor.getLong(idIndex),
                             value = cursor.getString(valueIndex),
                             type = when (detailType) {
                                 DetailType.EMAIL -> ContactsContract.CommonDataKinds.Email.getTypeLabelResource(
@@ -224,31 +265,36 @@ private fun Context.getDetails(
 }
 
 private val PROJECTION: Array<out String> = arrayOf(
+    ContactsContract.Contacts._ID,
     ContactsContract.Contacts.LOOKUP_KEY,
     ContactsContract.Contacts.DISPLAY_NAME,
     ContactsContract.Contacts.PHOTO_THUMBNAIL_URI
 )
 
 private val EMAIL_PROJECTION: Array<out String> = arrayOf(
+    ContactsContract.CommonDataKinds.Email._ID,
     ContactsContract.CommonDataKinds.Email.ADDRESS,
     ContactsContract.CommonDataKinds.Email.TYPE,
 )
 
 private const val EMAIL_SELECTION: String =
-    "${ContactsContract.Data.LOOKUP_KEY} = ? AND " +
-            "${ContactsContract.Data.MIMETYPE} = '${ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE}'"
+    "${ContactsContract.Data.CONTACT_ID} = ? AND " +
+            "${ContactsContract.Data.MIMETYPE} = '${ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE}' AND " +
+            "${ContactsContract.RawContacts.ACCOUNT_TYPE} = 'com.google'"
 
 private const val EMAIL_SORT_ORDER: String =
     "${ContactsContract.CommonDataKinds.Email.TYPE} ASC"
 
 private val PHONE_PROJECTION: Array<out String> = arrayOf(
+    ContactsContract.CommonDataKinds.Phone._ID,
     ContactsContract.CommonDataKinds.Phone.NUMBER,
     ContactsContract.CommonDataKinds.Phone.TYPE,
 )
 
 private const val PHONE_SELECTION: String =
-    "${ContactsContract.Data.LOOKUP_KEY} = ? AND " +
-            "${ContactsContract.Data.MIMETYPE} = '${ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE}'"
+    "${ContactsContract.Data.CONTACT_ID} = ? AND " +
+            "${ContactsContract.Data.MIMETYPE} = '${ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE}' AND " +
+            "${ContactsContract.RawContacts.ACCOUNT_TYPE} = 'com.google'"
 
 private const val PHONE_SORT_ORDER: String =
     "${ContactsContract.CommonDataKinds.Phone.TYPE} ASC"

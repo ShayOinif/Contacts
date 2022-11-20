@@ -15,17 +15,13 @@ private const val TYPE_DEBOUNCE = 300L
 private const val CONFIGURATION_CHANGE_TIMEOUT = 1_500L
 private const val QUERY_KEY = "query"
 
-/**
- * Here I used a hilt injected view model cause it's a bit easier to inject additional
- * dependencies alongside the saved state handle.
- */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     contactsRepository: ContactsRepository,
 ) : ViewModel() {
 
-    private val query =  savedStateHandle.getStateFlow(key = QUERY_KEY, initialValue = "")
+    private val query = savedStateHandle.getStateFlow<String?>(key = QUERY_KEY, initialValue = null)
 
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     private val contactsFlow = query
@@ -55,13 +51,22 @@ class HomeViewModel @Inject constructor(
     fun onInput(newQuery: String) {
         savedStateHandle[QUERY_KEY] = newQuery
     }
+
+    fun clearSearch() {
+        onInput(newQuery = "")
+    }
+
+    fun closeSearch() {
+        savedStateHandle[QUERY_KEY] = null
+    }
 }
 
 sealed interface HomeScreenUiState {
     object Loading : HomeScreenUiState
     data class Success(
         val contacts: List<Contact>,
-        val searchQuery: String,
+        val searchQuery: String?,
     ) : HomeScreenUiState
-    object Error: HomeScreenUiState
+
+    object Error : HomeScreenUiState
 }

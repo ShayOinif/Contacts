@@ -13,4 +13,5 @@
     <string name="no_permissions">You have no permissions</string>
     <string name="search">Search contacts</string>
     <string name="empty">Contacts list is empty</string>
+    <string name="home_header">Contacts</string>
 </resources>
