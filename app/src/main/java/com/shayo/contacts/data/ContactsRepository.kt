@@ -74,7 +74,7 @@ class ContactsRepository @Inject constructor(
                 onSuccess = { contactsList ->
                     // TODO: Maybe keep a map on available contacts avoid long find..
                     contactsList.find { contact ->
-                        lookupKey?.split(".")?.all { partialKey ->
+                        lookupKey?.split(".")?.any { partialKey ->
                             contact.lookupKey.contains(partialKey)
                         } == true
                     }?.let { contact ->
@@ -123,7 +123,7 @@ class ContactsRepository @Inject constructor(
         }
 
 
-    // TODO: Move to Work Manager, and incorporate is dirty mechanism in order to save only changes
+    // TODO: Move to Work Manager, and incorporate is dirty mechanism in order to update only changes
     suspend fun updateContact(detailedContact: DetailedContact) {
         detailedContact.emails.forEach {
             updateDetail(it.id, it.value)

@@ -58,7 +58,7 @@ private fun NavGraphBuilder.contactDetailScreen(
             type = NavType.StringType
         }
     )) {
-        val lookupKey = it.arguments?.getString(contactDetailRouteParam)
+        val lookupKey = it.arguments?.getString(contactDetailRouteParam) ?: "-1"
 
             ContactDetailScreen(
                 lookupKey = lookupKey,

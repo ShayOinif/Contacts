@@ -14,4 +14,9 @@
     <string name="search">Search contacts</string>
     <string name="empty">Contacts list is empty</string>
     <string name="home_header">Contacts</string>
+    <string name="edit_contact">Edit contact</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="email_address">Email address</string>
+    <string name="phone_number">Phone Number</string>
 </resources>

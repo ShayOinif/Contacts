@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shayo.contacts.data.ContactsRepository
 import com.shayo.contacts.data.model.Contact
+import com.shayo.contacts.utils.CONFIGURATION_CHANGE_TIMEOUT
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -12,7 +13,6 @@ import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 
 private const val TYPE_DEBOUNCE = 300L
-private const val CONFIGURATION_CHANGE_TIMEOUT = 1_500L
 private const val QUERY_KEY = "query"
 
 @HiltViewModel

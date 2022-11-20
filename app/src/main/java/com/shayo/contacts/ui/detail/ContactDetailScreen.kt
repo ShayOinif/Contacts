@@ -1,6 +1,6 @@
 package com.shayo.contacts.ui.detail
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -28,33 +29,62 @@ import com.shayo.contacts.ui.common.ContactInfo
 import com.shayo.contacts.ui.common.ErrorBox
 import com.shayo.contacts.ui.common.LoadingBox
 
-@OptIn(
-    ExperimentalLifecycleComposeApi::class, ExperimentalFoundationApi::class,
-    ExperimentalMaterial3Api::class
-)
+@OptIn(ExperimentalLifecycleComposeApi::class)
 @Composable
 fun ContactDetailScreen(
-    lookupKey: String?,
+    lookupKey: String,
     navigateBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
     detailViewModel: ContactDetailViewModel = hiltViewModel(),
 ) {
-    val state by detailViewModel.getDetailedContactFlow(lookupKey).collectAsStateWithLifecycle()
+    LaunchedEffect(key1 = detailViewModel) {
+        detailViewModel.setLookupKey(lookupKey)
+    }
 
-    // TODO: Break to stateless composable to avoid massive recomposition and recollecting
+    val state by detailViewModel.detailedContactFlow.collectAsStateWithLifecycle()
+
+    ContactDetailScreen(
+        navigateBack = navigateBack,
+        edit = detailViewModel::edit,
+        cancelEdit = detailViewModel::cancelEdit,
+        save = detailViewModel::save,
+        updateDetail = detailViewModel::updateDetail,
+        state = state,
+        modifier = modifier,
+    )
+}
+
+private const val EXPANDED_THRESHOLD = 0.4F
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ContactDetailScreen(
+    navigateBack: (() -> Unit)?,
+    edit: () -> Unit,
+    cancelEdit: () -> Unit,
+    save: () -> Unit,
+    updateDetail: (detailId: Long, newValue: String, detailType: DetailType) -> Unit,
+    state: ContactDetailUiState,
+    modifier: Modifier = Modifier,
+) {
     when (state) {
         is ContactDetailUiState.Success -> {
-            val detailedContact = (state as ContactDetailUiState.Success).detailedContact
-            val editing = (state as ContactDetailUiState.Success).editing
+            val detailedContact = state.detailedContact
+            val editing = state.editing
 
             val appBarState = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+            BackHandler(
+                enabled = state.editing,
+                onBack = cancelEdit
+            )
 
             Scaffold(
                 modifier = modifier.nestedScroll(appBarState.nestedScrollConnection),
                 topBar = {
                     LargeTopAppBar(
                         title = {
-                            if (appBarState.state.collapsedFraction > 0.4F) {
+                            if (appBarState.state.collapsedFraction > EXPANDED_THRESHOLD) {
                                 Text(text = detailedContact.contact.displayName)
                             } else {
                                 ContactInfo(contact = detailedContact.contact)
@@ -62,10 +92,10 @@ fun ContactDetailScreen(
                         },
                         actions = {
                             if (!editing) {
-                                IconButton(onClick = detailViewModel::edit) {
+                                IconButton(onClick = edit) {
                                     Icon(
                                         imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit contact"
+                                        contentDescription = stringResource(id = R.string.edit_contact)
                                     )
                                 }
                             }
@@ -87,7 +117,7 @@ fun ContactDetailScreen(
                     if (editing) {
                         NavigationBar {
                             NavigationBarItem(
-                                selected = false, onClick = detailViewModel::cancelEdit,
+                                selected = false, onClick = cancelEdit,
                                 icon = {
                                     Icon(
                                         imageVector = Icons.Default.Close,
@@ -100,7 +130,7 @@ fun ContactDetailScreen(
                             )
 
                             NavigationBarItem(
-                                selected = false, onClick = detailViewModel::save,
+                                selected = false, onClick = save,
                                 icon = {
                                     Icon(
                                         imageVector = Icons.Default.Check,
@@ -108,7 +138,7 @@ fun ContactDetailScreen(
                                     )
                                 },
                                 label = {
-                                    Text("Save")
+                                    Text(text = stringResource(id = R.string.save))
                                 }
                             )
                         }
@@ -127,7 +157,7 @@ fun ContactDetailScreen(
                             Divider()
                         }
 
-                        stickyHeader {
+                        item {
                             Text(
                                 text = stringResource(id = R.string.phones),
                                 style = MaterialTheme.typography.headlineMedium
@@ -142,14 +172,14 @@ fun ContactDetailScreen(
                                 TextField(
                                     value = phone.value,
                                     onValueChange = {
-                                        detailViewModel.updateDetail(phone.id, it, DetailType.PHONE)
+                                        updateDetail(phone.id, it, DetailType.PHONE)
                                     },
                                     enabled = editing,
                                     label = {
                                         Text(text = stringResource(id = phone.type))
                                     },
                                     placeholder = {
-                                        Text(text = "Phone Number")
+                                        Text(text = stringResource(R.string.phone_number))
                                     },
                                     keyboardOptions = KeyboardOptions.Default.copy(
                                         imeAction =
@@ -170,7 +200,7 @@ fun ContactDetailScreen(
                             Divider()
                         }
 
-                        stickyHeader {
+                        item {
                             Text(
                                 text = stringResource(id = R.string.emails),
                                 style = MaterialTheme.typography.headlineMedium
@@ -185,14 +215,14 @@ fun ContactDetailScreen(
                                 TextField(
                                     value = email.value,
                                     onValueChange = {
-                                        detailViewModel.updateDetail(email.id, it, DetailType.EMAIL)
+                                        updateDetail(email.id, it, DetailType.EMAIL)
                                     },
                                     enabled = editing,
                                     label = {
                                         Text(text = stringResource(id = email.type))
                                     },
                                     placeholder = {
-                                        Text(text = "Email address")
+                                        Text(text = stringResource(id = R.string.email_address))
                                     },
                                     keyboardOptions = KeyboardOptions.Default.copy(
                                         imeAction = if (index < detailedContact.emails.size - 1)
