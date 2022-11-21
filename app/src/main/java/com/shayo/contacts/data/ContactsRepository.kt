@@ -1,6 +1,6 @@
 package com.shayo.contacts.data
 
-import android.content.ContentValues
+import android.content.ContentProviderOperation
 import android.content.Context
 import android.database.ContentObserver
 import android.database.Cursor
@@ -9,10 +9,7 @@ import android.util.Log
 import androidx.core.database.getStringOrNull
 import com.shayo.contacts.data.model.*
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
@@ -65,18 +62,17 @@ class ContactsRepository @Inject constructor(
                     )
                 }
             }
-        }
+        }.flowOn(context = Dispatchers.IO)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getContact(lookupKey: String?) =
+    fun getContact(lookupKey: String) =
         contactsFlow.mapLatest { result ->
             result.fold(
                 onSuccess = { contactsList ->
-                    // TODO: Maybe keep a map on available contacts avoid long find..
                     contactsList.find { contact ->
-                        lookupKey?.split(".")?.any { partialKey ->
+                        lookupKey.split(".").any { partialKey ->
                             contact.lookupKey.contains(partialKey)
-                        } == true
+                        }
                     }?.let { contact ->
 
                         val selectionArgs = arrayOf<String?>("${contact.id}")
@@ -120,34 +116,36 @@ class ContactsRepository @Inject constructor(
                     Result.failure(it)
                 }
             )
-        }
+        }.flowOn(context = Dispatchers.IO)
 
-
-    // TODO: Move to Work Manager, and incorporate is dirty mechanism in order to update only changes
-    suspend fun updateContact(detailedContact: DetailedContact) {
-        detailedContact.emails.forEach {
-            updateDetail(it.id, it.value)
-        }
-
-        detailedContact.phones.forEach {
-            updateDetail(it.id, it.value)
-        }
-    }
-
-    private suspend fun updateDetail(
-        detailId: Long,
-        newValue: String,
+    /* TODO: Maybe analyze exception and results.. Though right now if there's a fail I'll live with a resulting no op.
+     * TODO: If have time, create an update method for each data type, currently relying on phone and email values residing
+     *  in the DATA1 column
+     */
+    suspend fun updateDetails(
+        contactDetails: List<ContactDetail>,
     ) {
-        val values = ContentValues().apply {
-            put(ContactsContract.Data.DATA1, newValue)
-        }
+        withContext(Dispatchers.IO) {
+            try {
+                val ops = ArrayList<ContentProviderOperation>()
 
-        context.contentResolver.update(
-            ContactsContract.Data.CONTENT_URI,
-            values,
-            "${ContactsContract.Data._ID} = ?",
-            arrayOf("$detailId")
-        )
+                contactDetails.forEach { contactDetail ->
+                    ops.add(
+                        ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI)
+                            .withSelection(
+                                ContactsContract.Data._ID + " = ?",
+                                arrayOf(contactDetail.id.toString())
+                            )
+                            .withValue(ContactsContract.Data.DATA1, contactDetail.value)
+                            .build()
+                    )
+                }
+
+                context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {}
+        }
     }
 }
 
@@ -235,7 +233,6 @@ private fun Context.getDetails(
                 Result.failure<List<ContactDetail>>(Exception(COLUMN_ERROR))
             else {
                 while (cursor.moveToNext()) {
-
                     details.add(
                         ContactDetail(
                             id = cursor.getLong(idIndex),
@@ -280,7 +277,7 @@ private val EMAIL_PROJECTION: Array<out String> = arrayOf(
 private const val EMAIL_SELECTION: String =
     "${ContactsContract.Data.CONTACT_ID} = ? AND " +
             "${ContactsContract.Data.MIMETYPE} = '${ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE}' AND " +
-            "${ContactsContract.RawContacts.ACCOUNT_TYPE} = 'com.google'"
+            "${ContactsContract.RawContacts.ACCOUNT_TYPE} IN ('com.google', 'vnd.sec.contact.phone')"
 
 private const val EMAIL_SORT_ORDER: String =
     "${ContactsContract.CommonDataKinds.Email.TYPE} ASC"
@@ -294,7 +291,7 @@ private val PHONE_PROJECTION: Array<out String> = arrayOf(
 private const val PHONE_SELECTION: String =
     "${ContactsContract.Data.CONTACT_ID} = ? AND " +
             "${ContactsContract.Data.MIMETYPE} = '${ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE}' AND " +
-            "${ContactsContract.RawContacts.ACCOUNT_TYPE} = 'com.google'"
+            "${ContactsContract.RawContacts.ACCOUNT_TYPE} IN ('com.google', 'vnd.sec.contact.phone')"
 
 private const val PHONE_SORT_ORDER: String =
     "${ContactsContract.CommonDataKinds.Phone.TYPE} ASC"
